@@ -6,4 +6,15 @@
     
         80
     ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/.class": true,
+        "*.o": true
+    },
+    "explorerExclude.backup": null,
 }

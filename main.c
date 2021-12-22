@@ -1,3 +1,69 @@
-int main(void){
-    return 0;
+#include <stdio.h>
+#include <mpi.h>
+#include <stdlib.h>
+
+double* make_matrix(int size, double init_value){
+	double* matrix = malloc(sizeof(double)*(size*size));
+	for(int x = 0; x < size*size; x++){
+		if (x < size || x % size == 0){
+			matrix[x] = init_value;
+		}
+	}
+	return matrix;
+}
+
+void print_matrix(double* matrix, int size){
+	for(int x = 0; x < size; x++){
+		for(int y = 0; y < size; y++){
+			printf("%f ", matrix[x*size + y]);
+		}
+		printf("\n");
+	}
+}
+
+int main(int argc, char** argv){
+	int rc, myrank, nproc, namelen;
+
+	int matrix_size = 15;
+	double* matrix = make_matrix(matrix_size, 1.0);
+	print_matrix(matrix, matrix_size);
+
+	char name[MPI_MAX_PROCESSOR_NAME];
+
+	rc = MPI_Init(&argc, &argv);
+	if (rc != MPI_SUCCESS){
+		printf("Error starting MPI program\n");
+		MPI_Abort(MPI_COMM_WORLD, rc);
+	}
+
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+	if (myrank == 0){
+		printf("main reports %d procs\n", nproc);
+
+	}
+
+	int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
+	int rem = ((matrix_size-1)*(matrix_size-1))%nproc;
+	double* p_matrix = malloc(sizeof(double)*p_size);
+	int start_point = (myrank*p_size)+matrix_size+1;
+	for(int x = start_point; x < p_size+start_point; x++){
+
+		double left_value = matrix[x-1];
+		double right_value = matrix[x-1];
+		double top_value = matrix[x-matrix_size];
+		double bottom_value = matrix[x+matrix_size];
+		double avg = (left_value+right_value+top_value+bottom_value)/4.0;
+		p_matrix[x-start_point] = avg;
+
+	}
+
+	namelen = MPI_MAX_PROCESSOR_NAME;
+	MPI_Get_processor_name(name, &namelen);
+	printf("hello world %d from %s\n", myrank, name);
+
+	MPI_Finalize();
+
+	return 0;
 }
