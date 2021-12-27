@@ -54,6 +54,7 @@ int main(int argc, char** argv){
 	int rc, myrank, nproc, namelen;
 
 	int matrix_size = 5;
+	int n_procs = 4;
 	double** matrix = make_matrix(matrix_size, 1.0);
 	print_matrix(matrix, matrix_size);
 	printf("\n");
@@ -74,6 +75,30 @@ int main(int argc, char** argv){
 		printf("main reports %d procs\n", nproc);
 		
 	}
+
+	int* counts = (int*)malloc(sizeof(int)*n_procs);
+	int* strides = (int*)malloc(sizeof(int)*n_procs);
+	int* displace = (int*)malloc(sizeof(int)*n_procs);
+	int prop, rem, offset;
+	prop = ((matrix_size-2)*(matrix_size-2))/n_procs;
+	rem = ((matrix_size-2)*(matrix_size-2))%n_procs;
+	double* recieve = malloc(sizeof(double)*((matrix_size-2)*(matrix_size-2))*5);
+	for (int x = 0; x < n_procs; x++){
+		counts[x] = prop*5;
+		strides[x] = prop*5;
+		displace[x] = offset;
+		offset += strides[x];
+	}
+
+	counts[n_procs-1] += rem*5;
+	strides[n_procs-1] += rem*5;
+
+	
+
+	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, prop+rem, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+
+
 
 	// int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
 	// int rem = ((matrix_size-1)*(matrix_size-1))%nproc;
