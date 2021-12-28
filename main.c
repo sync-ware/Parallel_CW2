@@ -86,8 +86,11 @@ int main(int argc, char** argv){
 	int* counts = (int*)malloc(sizeof(int)*n_procs);
 	int* strides = (int*)malloc(sizeof(int)*n_procs);
 	int* displace = (int*)malloc(sizeof(int)*n_procs);
+	int* recieve_counts = (int*)malloc(sizeof(int)*n_procs);
+	int* recieve_displace = (int*)malloc(sizeof(int)*n_procs);
 	int prop, rem;
 	int offset = 0;
+	int recieve_offset = 0;
 	prop = ((matrix_size-2)*(matrix_size-2))/n_procs;
 	rem = ((matrix_size-2)*(matrix_size-2))%n_procs;
 	double* recieve = malloc(sizeof(double)*(((matrix_size-2)*(matrix_size-2))*5));
@@ -96,10 +99,14 @@ int main(int argc, char** argv){
 		strides[x] = prop*5;
 		displace[x] = offset;
 		offset += strides[x];
+		recieve_counts[x] = prop;
+		recieve_displace[x] = recieve_offset;
+		recieve_offset += prop;
 	}
 
 	counts[n_procs-1] += rem*5;
 	strides[n_procs-1] += rem*5;
+	recieve_counts[n_procs-1] += rem;
 
 	print_int_array(counts, n_procs);
 	print_int_array(strides, n_procs);
@@ -117,6 +124,14 @@ int main(int argc, char** argv){
 
 	print_array(calculated, prop+rem);
 
+	double* root_retrieve = malloc(sizeof(double)*((prop+rem)*n_procs));
+
+	print_int_array(recieve_counts, n_procs);
+	print_int_array(recieve_displace, n_procs);
+
+	MPI_Gatherv(calculated, prop+rem, MPI_DOUBLE, root_retrieve, recieve_counts, recieve_displace, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+	print_array(root_retrieve, ((prop+rem)*n_procs));
 
 	// int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
 	// int rem = ((matrix_size-1)*(matrix_size-1))%nproc;
