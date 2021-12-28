@@ -34,6 +34,13 @@ void print_array(double* array, int size){
 	printf("\n");
 }
 
+void print_int_array(int* array, int size){
+	for(int x = 0; x < size; x++){
+		printf("%d\t", array[x]);
+	}
+	printf("\n");
+}
+
 double* convert_matrix(double** matrix, int size){
 	double* p_array = malloc(sizeof(double)*((size-2)*(size-2))*5);
 	int i = 0;
@@ -79,10 +86,11 @@ int main(int argc, char** argv){
 	int* counts = (int*)malloc(sizeof(int)*n_procs);
 	int* strides = (int*)malloc(sizeof(int)*n_procs);
 	int* displace = (int*)malloc(sizeof(int)*n_procs);
-	int prop, rem, offset;
+	int prop, rem;
+	int offset = 0;
 	prop = ((matrix_size-2)*(matrix_size-2))/n_procs;
 	rem = ((matrix_size-2)*(matrix_size-2))%n_procs;
-	double* recieve = malloc(sizeof(double)*((matrix_size-2)*(matrix_size-2))*5);
+	double* recieve = malloc(sizeof(double)*(((matrix_size-2)*(matrix_size-2))*5));
 	for (int x = 0; x < n_procs; x++){
 		counts[x] = prop*5;
 		strides[x] = prop*5;
@@ -93,11 +101,21 @@ int main(int argc, char** argv){
 	counts[n_procs-1] += rem*5;
 	strides[n_procs-1] += rem*5;
 
+	print_int_array(counts, n_procs);
+	print_int_array(strides, n_procs);
+	print_int_array(displace, n_procs);
 	
 
-	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, prop+rem, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, (prop+rem)*5, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+	print_array(recieve, (prop+rem)*5);
 
+	double* calculated = malloc(sizeof(double)*(prop+rem));
+	for (int x = 0; x < (prop+rem)*5; x+=5){
+		calculated[x/5] = (recieve[x] + recieve[x+1] + recieve[x+2] + recieve[x+3])/4;
+	}
+
+	print_array(calculated, prop+rem);
 
 
 	// int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
