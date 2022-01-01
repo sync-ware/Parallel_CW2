@@ -63,10 +63,17 @@ int main(int argc, char** argv){
 	int matrix_size = 5;
 	int n_procs = 4;
 	double** matrix = make_matrix(matrix_size, 1.0);
-	print_matrix(matrix, matrix_size);
-	printf("\n");
+	
+	
 	double* p_array = convert_matrix(matrix, matrix_size);
-	print_array(p_array, ((matrix_size-2)*(matrix_size-2))*5);
+
+	if (myrank == 0){
+		print_matrix(matrix, matrix_size);
+		printf("\n");
+		print_array(p_array, ((matrix_size-2)*(matrix_size-2))*5);
+	}
+	
+	
 	char name[MPI_MAX_PROCESSOR_NAME];
 
 	rc = MPI_Init(&argc, &argv);
@@ -91,8 +98,8 @@ int main(int argc, char** argv){
 	int prop, rem;
 	int offset = 0;
 	int recieve_offset = 0;
-	prop = ((matrix_size-2)*(matrix_size-2))/n_procs;
-	rem = ((matrix_size-2)*(matrix_size-2))%n_procs;
+	prop = ((matrix_size-2)*(matrix_size-2))/n_procs; // 9/4 = 2
+	rem = ((matrix_size-2)*(matrix_size-2))%n_procs; // 9%4 = 1
 	double* recieve = malloc(sizeof(double)*(((matrix_size-2)*(matrix_size-2))*5));
 	for (int x = 0; x < n_procs; x++){
 		counts[x] = prop*5;
@@ -108,13 +115,16 @@ int main(int argc, char** argv){
 	strides[n_procs-1] += rem*5;
 	recieve_counts[n_procs-1] += rem;
 
-	print_int_array(counts, n_procs);
-	print_int_array(strides, n_procs);
-	print_int_array(displace, n_procs);
+	if (myrank == 0){
+		print_int_array(counts, n_procs);
+		print_int_array(strides, n_procs);
+		print_int_array(displace, n_procs);
+	}
 	
 
 	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, (prop+rem)*5, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+	printf("Process %d has recieved: \n", myrank);
 	print_array(recieve, (prop+rem)*5);
 
 	double* calculated = malloc(sizeof(double)*(prop+rem));
@@ -122,16 +132,32 @@ int main(int argc, char** argv){
 		calculated[x/5] = (recieve[x] + recieve[x+1] + recieve[x+2] + recieve[x+3])/4;
 	}
 
+	printf("Process %d has calculated: \n", myrank);
 	print_array(calculated, prop+rem);
 
 	double* root_retrieve = malloc(sizeof(double)*((prop+rem)*n_procs));
 
-	print_int_array(recieve_counts, n_procs);
-	print_int_array(recieve_displace, n_procs);
+	// print_int_array(recieve_counts, n_procs);
+	// print_int_array(recieve_displace, n_procs);
 
-	MPI_Gatherv(calculated, prop+rem, MPI_DOUBLE, root_retrieve, recieve_counts, recieve_displace, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gatherv(calculated, prop, MPI_DOUBLE, root_retrieve, recieve_counts, recieve_displace, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-	print_array(root_retrieve, ((prop+rem)*n_procs));
+	if (myrank == 0){
+		printf("Recieved values: \n");
+		print_array(root_retrieve, ((prop+rem)*n_procs));
+
+		int retrieve_count = 0;
+		for(int y = 1; y < matrix_size; y++){
+			for (int x = 1; x < matrix_size; x++){
+				matrix[y][x] = root_retrieve[retrieve_count++];
+			}
+		}
+
+		printf("Matrix: \n");
+		print_matrix(matrix, matrix_size);
+	}
+
+	
 
 	// int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
 	// int rem = ((matrix_size-1)*(matrix_size-1))%nproc;
@@ -148,9 +174,9 @@ int main(int argc, char** argv){
 
 	// }
 
-	namelen = MPI_MAX_PROCESSOR_NAME;
-	MPI_Get_processor_name(name, &namelen);
-	printf("hello world %d from %s\n", myrank, name);
+	// namelen = MPI_MAX_PROCESSOR_NAME;
+	// MPI_Get_processor_name(name, &namelen);
+	// printf("hello world %d from %s\n", myrank, name);
 
 	MPI_Finalize();
 
