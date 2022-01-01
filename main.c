@@ -46,11 +46,11 @@ double* convert_matrix(double** matrix, int size){
 	int i = 0;
 	for(int y = 1; y < size-1; y++){
 		for (int x = 1; x < size-1; x++){
-			p_array[i] = matrix[y][x-1]; // Left
-			p_array[++i] = matrix[y-1][x]; // Top
-			p_array[++i] = matrix[y][x+1]; // Right
-			p_array[++i] = matrix[y+1][x]; // Bottom
-			p_array[++i] = matrix[y][x]; // Centre
+			p_array[i++] = matrix[y][x-1]; // Left
+			p_array[i++] = matrix[y-1][x]; // Top
+			p_array[i++] = matrix[y][x+1]; // Right
+			p_array[i++] = matrix[y+1][x]; // Bottom
+			p_array[i++] = matrix[y][x]; // Centre
 		}
 	}
 
@@ -63,17 +63,11 @@ int main(int argc, char** argv){
 	int matrix_size = 5;
 	int n_procs = 4;
 	double** matrix = make_matrix(matrix_size, 1.0);
-	
-	
+
+
 	double* p_array = convert_matrix(matrix, matrix_size);
 
-	if (myrank == 0){
-		print_matrix(matrix, matrix_size);
-		printf("\n");
-		print_array(p_array, ((matrix_size-2)*(matrix_size-2))*5);
-	}
-	
-	
+
 	char name[MPI_MAX_PROCESSOR_NAME];
 
 	rc = MPI_Init(&argc, &argv);
@@ -88,6 +82,9 @@ int main(int argc, char** argv){
 	if (myrank == 0){
 		printf("main reports %d procs\n", nproc);
 		
+		print_matrix(matrix, matrix_size);
+		printf("\n");
+		print_array(p_array, ((matrix_size-2)*(matrix_size-2))*5);
 	}
 
 	int* counts = (int*)malloc(sizeof(int)*n_procs);
@@ -100,7 +97,7 @@ int main(int argc, char** argv){
 	int recieve_offset = 0;
 	prop = ((matrix_size-2)*(matrix_size-2))/n_procs; // 9/4 = 2
 	rem = ((matrix_size-2)*(matrix_size-2))%n_procs; // 9%4 = 1
-	double* recieve = malloc(sizeof(double)*(((matrix_size-2)*(matrix_size-2))*5));
+	double* recieve;
 	for (int x = 0; x < n_procs; x++){
 		counts[x] = prop*5;
 		strides[x] = prop*5;
@@ -120,22 +117,29 @@ int main(int argc, char** argv){
 		print_int_array(strides, n_procs);
 		print_int_array(displace, n_procs);
 	}
-	
 
-	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, (prop+rem)*5, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	int recieve_count = prop*5;
+	if (myrank == n_procs-1){
+		recieve_count += rem*5;
+	}
 
-	printf("Process %d has recieved: \n", myrank);
-	print_array(recieve, (prop+rem)*5);
+	// printf("Process %d has %d elements\n", myrank, recieve_count);
 
-	double* calculated = malloc(sizeof(double)*(prop+rem));
-	for (int x = 0; x < (prop+rem)*5; x+=5){
+	recieve = malloc(sizeof(double)*recieve_count);
+	MPI_Scatterv(p_array, counts, displace, MPI_DOUBLE, recieve, recieve_count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+	//printf("Process %d has recieved: \n", myrank);
+	//print_array(recieve, recieve_count);
+
+	double* calculated = malloc(sizeof(double)*(recieve_count/5));
+	for (int x = 0; x < recieve_count; x+=5){
 		calculated[x/5] = (recieve[x] + recieve[x+1] + recieve[x+2] + recieve[x+3])/4;
 	}
 
-	printf("Process %d has calculated: \n", myrank);
-	print_array(calculated, prop+rem);
+	// printf("Process %d has calculated: \n", myrank);
+	// print_array(calculated, prop+rem);
 
-	double* root_retrieve = malloc(sizeof(double)*((prop+rem)*n_procs));
+	double* root_retrieve = malloc(sizeof(double)*((matrix_size-2)*(matrix_size-2)));
 
 	// print_int_array(recieve_counts, n_procs);
 	// print_int_array(recieve_displace, n_procs);
@@ -144,11 +148,11 @@ int main(int argc, char** argv){
 
 	if (myrank == 0){
 		printf("Recieved values: \n");
-		print_array(root_retrieve, ((prop+rem)*n_procs));
+		print_array(root_retrieve, ((matrix_size-2)*(matrix_size-2)));
 
 		int retrieve_count = 0;
-		for(int y = 1; y < matrix_size; y++){
-			for (int x = 1; x < matrix_size; x++){
+		for(int y = 1; y < matrix_size-1; y++){
+			for (int x = 1; x < matrix_size-1; x++){
 				matrix[y][x] = root_retrieve[retrieve_count++];
 			}
 		}
@@ -157,7 +161,7 @@ int main(int argc, char** argv){
 		print_matrix(matrix, matrix_size);
 	}
 
-	
+
 
 	// int p_size = ((matrix_size-1)*(matrix_size-1))/nproc;
 	// int rem = ((matrix_size-1)*(matrix_size-1))%nproc;
