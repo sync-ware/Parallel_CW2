@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 
 // Make an initial square matrix that takes a size and an initial value for the 
 // left and top values
@@ -104,15 +105,19 @@ int main(int argc, char** argv){
 
 	int rc, myrank, nproc;
 
-	double** matrix = make_matrix(matrix_size, default_value);
-
-	// Create our problem array, this will be split via scatter to share the
-	// calculations.
-	double* p_array = convert_matrix(matrix, matrix_size);
-
 	//char name[MPI_MAX_PROCESSOR_NAME];
 
 	rc = MPI_Init(&argc, &argv);
+
+	//MPI_Bcast(p_array, ((matrix_size-2)*(matrix_size-2)*5), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+
+
+	// matrix = make_matrix(matrix_size, default_value);
+
+	// 	// Create our problem array, this will be split via scatter to share the
+	// 	// calculations.
+	// 	p_array = convert_matrix(matrix, matrix_size);
 
 	if (rc != MPI_SUCCESS){
 		printf("Error starting MPI program\n");
@@ -133,6 +138,23 @@ int main(int argc, char** argv){
 	// Check that that correct number of processors has been initialised
 	if (myrank == 0){
 		printf("main reports %d procs \n", nproc);
+	}
+
+	double** matrix;
+	double* p_array;
+
+	// We only need to populate this for rank 0
+	if (myrank == 0){
+		
+		matrix = make_matrix(matrix_size, default_value);
+
+		// Create our problem array, this will be split via scatter to share the
+		// calculations.
+		p_array = convert_matrix(matrix, matrix_size);
+
+
+	} else {
+		p_array = NULL;
 	}
 
 	// Here we need arrays of ints that store specific information for scatterv
@@ -229,7 +251,9 @@ int main(int argc, char** argv){
 			calculated[x/5] = 
 				(recieve[x] + recieve[x+1] + recieve[x+2] + recieve[x+3])/4.0;
 			//printf("Comparing %f and %f\n", calculated[x/5], recieve[x+4]);
-			if ((calculated[x/5] - recieve[x+4]) >= precision){
+
+			// Fabs is used to account for the possibility of negative values
+			if ((fabs(calculated[x/5]) - fabs(recieve[x+4])) >= precision){
 				// We can see that we still require calculating if at least one
 				// point doesn't meet the requirements.
 				status = 0;
