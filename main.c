@@ -109,16 +109,6 @@ int main(int argc, char** argv){
 
 	rc = MPI_Init(&argc, &argv);
 
-	//MPI_Bcast(p_array, ((matrix_size-2)*(matrix_size-2)*5), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-
-
-	// matrix = make_matrix(matrix_size, default_value);
-
-	// 	// Create our problem array, this will be split via scatter to share the
-	// 	// calculations.
-	// 	p_array = convert_matrix(matrix, matrix_size);
-
 	if (rc != MPI_SUCCESS){
 		printf("Error starting MPI program\n");
 		MPI_Abort(MPI_COMM_WORLD, rc);
@@ -193,7 +183,7 @@ int main(int argc, char** argv){
 			counts[x] += 5;
 		}
 		offset += counts[x];
-
+		
 		// Apply same logic for the recieve counts
 		recieve_counts[x] = prop;
 		recieve_displace[x] = recieve_offset;
@@ -231,6 +221,8 @@ int main(int argc, char** argv){
 	int status; // The status of a particular process
 	int processing = 1; // The processing state of a process
 
+	double* root_retrieve = NULL;
+
 	while (processing){
 		// Set status to 1 indicates that we have reached the goal state, this
 		// will be disproved when we check the calculations against the previous
@@ -261,8 +253,10 @@ int main(int argc, char** argv){
 		}
 
 		// The array that will take back all the calculations into one array
-		double* root_retrieve = 
-			malloc(sizeof(double)*((matrix_size-2)*(matrix_size-2)));
+		if (myrank == 0){
+			root_retrieve =
+				malloc(sizeof(double)*((matrix_size-2)*(matrix_size-2)));
+		}
 
 		// Gather all the calculations and place them into root_retrieve
 		MPI_Gatherv(calculated, recieve_count/5, MPI_DOUBLE, root_retrieve, 
@@ -286,9 +280,12 @@ int main(int argc, char** argv){
 		// Free calculated as that is no longer in use at this point, it will be
 		// re-allocated when we continue to process
 		free(calculated);
-		// Free root_retrieve as we have already made use of the values and put
-		// them back into the matrix
-		free(root_retrieve);
+
+		if (myrank == 0){
+			// Free root_retrieve as we have already made use of the values and 
+			// put them back into the matrix
+			free(root_retrieve);
+		}
 
 		// Gather all the statuses for so we can stop processing, this needs to
 		// be communicated to each process so that they can all stop
@@ -312,12 +309,12 @@ int main(int argc, char** argv){
 		if (processing && myrank == 0){
 			// Check timings of how long it takes to convert a matrix to a
 			// problem array
-			double c_time1, c_time2;
-			c_time1 = MPI_Wtime();
+			//double c_time1, c_time2;
+			//c_time1 = MPI_Wtime();
 			free(p_array);
 			p_array = convert_matrix(matrix, matrix_size);
-			c_time2 = MPI_Wtime();
-			printf("Conversion time: %f secs\n", (c_time2-c_time1));
+			//c_time2 = MPI_Wtime();
+			//printf("Conversion time: %f secs\n", (c_time2-c_time1));
 		}
 	}
 
